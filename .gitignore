@@ -1,0 +1,12 @@
+.claude
+
+.env
+node_modules
+
+.pnpm-store
+.vscode/*
+dist
+
+.turbo
+
+.pnpm-debug.log*

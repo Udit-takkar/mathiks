@@ -1,0 +1,42 @@
+name = "damp-block-c720"
+main = "src/index.ts"
+compatibility_date = "2025-09-27"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+binding = "ASSETS"
+directory = "./public"
+
+[observability]
+enabled = true
+
+# Durable Objects
+[[durable_objects.bindings]]
+name = "ROOM"
+class_name = "RoomDurableObject"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["RoomDurableObject"]
+
+# D1
+[[d1_databases]]
+binding = "DB"
+database_name = "mathiks-db"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+preview_database_id = "REPLACE_WITH_D1_PREVIEW_DATABASE_ID"
+
+# Queues
+[[queues.producers]]
+binding = "JOBS_QUEUE"
+queue = "mathiks-jobs"
+
+[[queues.consumers]]
+queue = "mathiks-jobs"
+
+# Hyperdrive
+[[hyperdrive]]
+binding = "HYPERDRIVE"
+id = "REPLACE_WITH_HYPERDRIVE_ID"
+# localConnectionString = "postgresql://user:pass@localhost:5432/db"
+
