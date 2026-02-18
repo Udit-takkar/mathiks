@@ -21,14 +21,14 @@ new_sqlite_classes = ["RoomDurableObject"]
 
 # D1
 [[d1_databases]]
-binding = "DB"
+binding = "mathiks_db"
 database_name = "mathiks-db"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
-preview_database_id = "REPLACE_WITH_D1_PREVIEW_DATABASE_ID"
+database_id = "1defe692-9700-4d02-94b9-49d8a6e98d39"
+preview_database_id = "1defe692-9700-4d02-94b9-49d8a6e98d39"
 
 # Queues
 [[queues.producers]]
-binding = "JOBS_QUEUE"
+binding = "mathiks_jobs"
 queue = "mathiks-jobs"
 
 [[queues.consumers]]
@@ -37,6 +37,6 @@ queue = "mathiks-jobs"
 # Hyperdrive
 [[hyperdrive]]
 binding = "HYPERDRIVE"
-id = "REPLACE_WITH_HYPERDRIVE_ID"
+id = "432028a0868947689575f188be8f59cf"
 # localConnectionString = "postgresql://user:pass@localhost:5432/db"
 
