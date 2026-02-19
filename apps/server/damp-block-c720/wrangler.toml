@@ -13,11 +13,16 @@ enabled = true
 # Durable Objects
 [[durable_objects.bindings]]
 name = "ROOM"
-class_name = "RoomDurableObject"
+class_name = "GameRoom"
+
+[[durable_objects.bindings]]
+name = "MATCHMAKER"
+class_name = "MatchMaker"
 
 [[migrations]]
 tag = "v1"
-new_sqlite_classes = ["RoomDurableObject"]
+new_sqlite_classes = ["GameRoom"]
+new_classes = ["MatchMaker"]
 
 # D1
 [[d1_databases]]
@@ -25,6 +30,7 @@ binding = "mathiks_db"
 database_name = "mathiks-db"
 database_id = "1defe692-9700-4d02-94b9-49d8a6e98d39"
 preview_database_id = "1defe692-9700-4d02-94b9-49d8a6e98d39"
+migrations_dir = "./drizzle/migrations"
 
 # Queues
 [[queues.producers]]
@@ -34,9 +40,7 @@ queue = "mathiks-jobs"
 [[queues.consumers]]
 queue = "mathiks-jobs"
 
-# Hyperdrive
+# Hyperdrive (Neon PostgreSQL connection pooling)
 [[hyperdrive]]
 binding = "HYPERDRIVE"
 id = "432028a0868947689575f188be8f59cf"
-# localConnectionString = "postgresql://user:pass@localhost:5432/db"
-
