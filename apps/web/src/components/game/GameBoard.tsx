@@ -8,13 +8,16 @@ import { QuestionDisplay } from "./QuestionDisplay";
 import { AnswerInput } from "./AnswerInput";
 import { MatchResult } from "./MatchResult";
 
-const TEMP_USER_ID = "user-" + Math.random().toString(36).slice(2, 8);
-const TEMP_ELO = 1200;
+interface GameBoardProps {
+  userId: string;
+  elo: number;
+  userName: string;
+}
 
-export function GameBoard() {
+export function GameBoard({ userId, elo, userName }: GameBoardProps) {
   const { phase } = useGameStore();
-  const { joinQueue, leaveQueue } = useMatchmaking(TEMP_USER_ID, TEMP_ELO);
-  const { submitAnswer } = useGameRoom(TEMP_USER_ID, TEMP_ELO);
+  const { joinQueue, leaveQueue } = useMatchmaking(userId, elo);
+  const { submitAnswer } = useGameRoom(userId, elo);
 
   if (phase === "idle") {
     return (
@@ -25,7 +28,7 @@ export function GameBoard() {
           <Button
             onClick={joinQueue}
             size="lg"
-            className="rounded-xl bg-violet-600 px-10 text-lg font-semibold hover:bg-violet-500"
+            className="rounded-xl bg-lime-accent px-10 text-lg font-semibold text-black hover:bg-lime-accent/90"
           >
             Play
           </Button>
@@ -38,7 +41,7 @@ export function GameBoard() {
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center bg-game-bg">
         <div className="flex flex-col items-center gap-6">
-          <div className="h-10 w-10 animate-spin rounded-full border-2 border-violet-500 border-t-transparent" />
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-lime-accent border-t-transparent" />
           <p className="text-lg text-neutral-400">Finding opponent...</p>
           <Button
             onClick={leaveQueue}
@@ -54,7 +57,7 @@ export function GameBoard() {
 
   return (
     <div className="flex min-h-dvh flex-col bg-game-bg">
-      <ScoreBoard />
+      <ScoreBoard userName={userName} userElo={elo} />
       <QuestionDisplay />
       <AnswerInput onSubmit={submitAnswer} disabled={phase === "ended"} />
       {phase === "ended" && <MatchResult />}

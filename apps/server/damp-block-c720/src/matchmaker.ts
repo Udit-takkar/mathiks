@@ -4,6 +4,7 @@ import { encode, decode } from "./protocol";
 interface QueuedPlayer {
   userId: string;
   elo: number;
+  name: string;
   ws: WebSocket;
   joinedAt: number;
 }
@@ -32,7 +33,8 @@ export class MatchMaker extends DurableObject<Env> {
     const [client, server] = Object.values(pair);
 
     const userId = url.searchParams.get("userId") ?? "";
-    this.ctx.acceptWebSocket(server, [userId]);
+    const name = url.searchParams.get("name") ?? "";
+    this.ctx.acceptWebSocket(server, [userId, name]);
 
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -51,9 +53,13 @@ export class MatchMaker extends DurableObject<Env> {
         return;
       }
 
+      const tags = this.ctx.getTags(ws);
+      const name = tags[1] ?? "";
+
       this.queue.push({
         userId: msg.userId,
         elo: msg.elo,
+        name,
         ws,
         joinedAt: Date.now(),
       });
@@ -107,14 +113,14 @@ export class MatchMaker extends DurableObject<Env> {
       encode({
         t: "matched",
         roomId,
-        opponent: { userId: b.userId, elo: b.elo },
+        opponent: { userId: b.userId, elo: b.elo, name: b.name },
       }),
     );
     b.ws.send(
       encode({
         t: "matched",
         roomId,
-        opponent: { userId: a.userId, elo: a.elo },
+        opponent: { userId: a.userId, elo: a.elo, name: a.name },
       }),
     );
   }

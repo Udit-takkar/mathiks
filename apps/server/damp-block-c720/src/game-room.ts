@@ -6,6 +6,7 @@ interface PlayerState {
   index: 0 | 1;
   userId: string;
   elo: number;
+  name: string;
   questionIndex: number;
   nextQuestionKey: Uint8Array | null;
 }
@@ -25,6 +26,7 @@ export class GameRoom extends DurableObject<Env> {
     const url = new URL(request.url);
     const userId = url.searchParams.get("userId") ?? crypto.randomUUID();
     const elo = Number(url.searchParams.get("elo") ?? 1200);
+    const name = url.searchParams.get("name") ?? "";
 
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
@@ -36,6 +38,7 @@ export class GameRoom extends DurableObject<Env> {
       index: playerIndex,
       userId,
       elo,
+      name,
       questionIndex: 0,
       nextQuestionKey: null,
     });
@@ -91,7 +94,7 @@ export class GameRoom extends DurableObject<Env> {
     const revealKey = player.nextQuestionKey;
 
     const nextNextQ = generateQuestion(this.seed, player.questionIndex + 1);
-    const { encrypted, key } = await encryptQuestion(nextNextQ);
+    const { encrypted, key } = await encryptQuestion({ expression: nextNextQ.expression, digits: String(nextNextQ.answer).length });
     player.nextQuestionKey = key;
 
     ws.send(
@@ -122,7 +125,7 @@ export class GameRoom extends DurableObject<Env> {
 
       const firstQ = generateQuestion(this.seed, 0);
       const secondQ = generateQuestion(this.seed, 1);
-      const { encrypted, key } = await encryptQuestion(secondQ);
+      const { encrypted, key } = await encryptQuestion({ expression: secondQ.expression, digits: String(secondQ.answer).length });
       player.nextQuestionKey = key;
 
       const opponents = [...this.players.entries()].find(([s]) => s !== ws);
@@ -131,11 +134,13 @@ export class GameRoom extends DurableObject<Env> {
       ws.send(
         encode({
           t: "game_start",
-          q: firstQ,
+          q: { expression: firstQ.expression, digits: String(firstQ.answer).length },
           nextEnc: encrypted,
           startsAt: this.gameStartAt,
           duration: this.gameDuration,
-          opp: oppState ? { userId: oppState.userId, elo: oppState.elo } : null,
+          opp: oppState
+            ? { userId: oppState.userId, elo: oppState.elo, name: oppState.name }
+            : null,
         }),
       );
     }
@@ -143,7 +148,26 @@ export class GameRoom extends DurableObject<Env> {
 
   async alarm() {
     const players = [...this.players.entries()];
-    const [p1State, p2State] = players.map(([, p]) => p);
+    const states = players.map(([, p]) => p);
+    const p1State = states.find((p) => p.index === 0);
+    const p2State = states.find((p) => p.index === 1);
+
+    if (!p1State || !p2State) {
+      for (const [ws] of players) {
+        ws.send(
+          encode({
+            t: "game_end",
+            result: "draw",
+            eloDelta: 0,
+            newElo: (states[0]?.elo ?? 1200),
+            scores: this.scores,
+          }),
+        );
+        ws.close(1000, "game over");
+      }
+      this.players.clear();
+      return;
+    }
 
     const result =
       this.scores[0] > this.scores[1]
@@ -171,6 +195,8 @@ export class GameRoom extends DurableObject<Env> {
       const isP1 = player.index === 0;
       const won = isP1 ? p1Won : p2Won;
       const eloDelta = isP1 ? p1EloDelta : p2EloDelta;
+      const myScore = isP1 ? this.scores[0] : this.scores[1];
+      const oppScore = isP1 ? this.scores[1] : this.scores[0];
 
       ws.send(
         encode({
@@ -178,7 +204,7 @@ export class GameRoom extends DurableObject<Env> {
           result: won ? "win" : isDraw ? "draw" : "lose",
           eloDelta,
           newElo: player.elo + eloDelta,
-          scores: this.scores,
+          scores: [myScore, oppScore],
         }),
       );
       ws.close(1000, "game over");

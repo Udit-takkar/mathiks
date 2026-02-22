@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Input } from "@/components/ui/input";
+import { useGameStore } from "@/lib/store";
 
 interface AnswerInputProps {
   onSubmit: (answer: number) => void;
@@ -10,23 +11,52 @@ interface AnswerInputProps {
 
 export function AnswerInput({ onSubmit, disabled }: AnswerInputProps) {
   const [value, setValue] = useState("");
+  const [shake, setShake] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const wrongAnswer = useGameStore((s) => s.wrongAnswer);
+  const digits = useGameStore((s) => s.question?.digits ?? 0);
 
-  const handleSubmit = useCallback(() => {
-    const num = Number(value);
-    if (value !== "" && !isNaN(num)) {
-      onSubmit(num);
-      setValue("");
+  useEffect(() => {
+    if (wrongAnswer) {
+      setShake(true);
+      const timer = setTimeout(() => setShake(false), 500);
+      return () => clearTimeout(timer);
     }
-  }, [value, onSubmit]);
+  }, [wrongAnswer]);
+
+  const submit = useCallback(
+    (v: string) => {
+      const num = Number(v);
+      if (v !== "" && !isNaN(num)) {
+        onSubmit(num);
+        setValue("");
+      }
+    },
+    [onSubmit],
+  );
+
+  const handleChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const next = e.target.value;
+      setValue(next);
+      if (digits > 0 && next.length === digits) {
+        const num = Number(next);
+        if (!isNaN(num)) {
+          onSubmit(num);
+          setValue("");
+        }
+      }
+    },
+    [digits, onSubmit],
+  );
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === "Enter") {
-        handleSubmit();
+        submit(value);
       }
     },
-    [handleSubmit],
+    [submit, value],
   );
 
   return (
@@ -40,17 +70,19 @@ export function AnswerInput({ onSubmit, disabled }: AnswerInputProps) {
         inputMode="numeric"
         pattern="-?[0-9]*"
         value={value}
-        onChange={(e) => setValue(e.target.value)}
+        onChange={handleChange}
         onKeyDown={handleKeyDown}
         disabled={disabled}
         placeholder="Enter Answer"
         autoFocus
-        className="
-          h-12 max-w-sm rounded-xl border-game-border bg-game-surface
+        className={`
+          h-12 max-w-sm rounded-xl bg-game-surface
           text-center text-lg text-neutral-200
           placeholder:text-neutral-600
-          focus-visible:border-neutral-500 focus-visible:ring-0
-        "
+          focus-visible:ring-0 transition-colors
+          ${wrongAnswer ? "border-red-500 focus-visible:border-red-500" : "border-game-border focus-visible:border-neutral-500"}
+          ${shake ? "animate-shake" : ""}
+        `}
       />
     </div>
   );

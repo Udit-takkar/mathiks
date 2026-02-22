@@ -59,6 +59,7 @@ export function useMatchmaking(userId: string, elo: number) {
 export function useGameRoom(userId: string, elo: number) {
   const socketRef = useRef<GameSocket | null>(null);
   const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const answerSentAt = useRef<number>(0);
   const store = useGameStore();
 
   useEffect(() => {
@@ -80,6 +81,9 @@ export function useGameRoom(userId: string, elo: number) {
             clearInterval(pingIntervalRef.current);
             pingIntervalRef.current = null;
           }
+          pingIntervalRef.current = setInterval(() => {
+            socket.send({ t: "ping" });
+          }, 10_000);
         }, 2000);
       },
       onMessage: async (msg: ServerMessage) => {
@@ -98,13 +102,23 @@ export function useGameRoom(userId: string, elo: number) {
             );
             break;
 
-          case "result":
+          case "result": {
+            if (answerSentAt.current > 0) {
+              store.setLatency(Date.now() - answerSentAt.current);
+              answerSentAt.current = 0;
+            }
+            if (!msg.ok) {
+              store.setWrongAnswer(true);
+            }
             store.updateScores(msg.scores);
-            if (msg.ok && msg.key && store.nextEncrypted) {
-              const decrypted = await decryptQuestion(store.nextEncrypted, msg.key);
+            const { nextEncrypted } = useGameStore.getState();
+            if (msg.ok && msg.key && nextEncrypted) {
+              store.setWrongAnswer(false);
+              const decrypted = await decryptQuestion(nextEncrypted, msg.key);
               store.setQuestion(decrypted, msg.nextEnc);
             }
             break;
+          }
 
           case "opp_answered":
             store.updateScores(msg.scores);
@@ -125,7 +139,7 @@ export function useGameRoom(userId: string, elo: number) {
           clearInterval(pingIntervalRef.current);
           pingIntervalRef.current = null;
         }
-        if (store.phase === "playing") {
+        if (useGameStore.getState().phase === "playing") {
           toast.error("Connection lost");
         }
       },
@@ -145,7 +159,12 @@ export function useGameRoom(userId: string, elo: number) {
   }, [store.roomId]);
 
   const submitAnswer = useCallback((answer: number) => {
-    socketRef.current?.send({ t: "answer", a: answer });
+    useGameStore.getState().setWrongAnswer(false);
+    answerSentAt.current = Date.now();
+    const sent = socketRef.current?.send({ t: "answer", a: answer });
+    if (!sent) {
+      toast.error("Connection lost. Answer not sent.");
+    }
   }, []);
 
   return { submitAnswer };

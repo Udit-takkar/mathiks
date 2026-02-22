@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useGameStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import {
@@ -8,43 +9,55 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogFooter,
 } from "@/components/ui/dialog";
 
 const config = {
   win: {
-    title: "Victory!",
-    titleClass: "text-green-400",
-    badge: "bg-green-500/15 text-green-400 ring-1 ring-green-500/30",
+    title: "Victory",
+    emoji: "🏆",
+    titleClass: "text-lime-accent",
+    scoreBorder: "border-lime-accent/20",
   },
   lose: {
     title: "Defeat",
+    emoji: "💀",
     titleClass: "text-red-400",
-    badge: "bg-red-500/15 text-red-400 ring-1 ring-red-500/30",
+    scoreBorder: "border-red-400/20",
   },
   draw: {
     title: "Draw",
+    emoji: "🤝",
     titleClass: "text-amber-400",
-    badge: "bg-amber-500/15 text-amber-400 ring-1 ring-amber-500/30",
+    scoreBorder: "border-amber-400/20",
   },
 };
 
 export function MatchResult() {
+  const router = useRouter();
   const { result, eloDelta, newElo, scores, reset } = useGameStore();
 
   if (!result) return null;
 
   const c = config[result];
   const eloSign = eloDelta >= 0 ? "+" : "";
+  const eloColor =
+    eloDelta > 0
+      ? "text-lime-accent"
+      : eloDelta < 0
+        ? "text-red-400"
+        : "text-neutral-400";
 
   return (
     <Dialog open onOpenChange={() => reset()}>
       <DialogContent
         showCloseButton={false}
-        className="w-72 border-game-border bg-game-surface p-8 sm:max-w-72"
+        className="w-80 gap-0 border-game-border bg-game-surface p-0 sm:max-w-80"
       >
-        <DialogHeader className="items-center">
-          <DialogTitle className={`text-5xl font-extrabold ${c.titleClass}`}>
+        <DialogHeader className="items-center pb-0 pt-8">
+          <p className="text-4xl">{c.emoji}</p>
+          <DialogTitle
+            className={`text-3xl font-extrabold uppercase tracking-tight ${c.titleClass}`}
+          >
             {c.title}
           </DialogTitle>
           <DialogDescription className="sr-only">
@@ -52,46 +65,58 @@ export function MatchResult() {
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex w-full items-center justify-center gap-6">
-          <div className="text-center">
-            <p className="text-3xl font-extrabold text-neutral-200 tabular-nums">
-              {scores[0]}
-            </p>
-            <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
-              You
-            </p>
-          </div>
-          <span className="text-xl text-neutral-600">:</span>
-          <div className="text-center">
-            <p className="text-3xl font-extrabold text-neutral-200 tabular-nums">
-              {scores[1]}
-            </p>
-            <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
-              Opponent
-            </p>
-          </div>
-        </div>
-
-        <div className="flex flex-col items-center gap-1">
-          <span
-            className={`rounded-full px-4 py-1 text-lg font-bold tabular-nums ${c.badge}`}
+        <div className="px-8 py-6">
+          <div
+            className={`flex items-center justify-center rounded-xl border ${c.scoreBorder} bg-landing-bg px-6 py-4`}
           >
-            {eloSign}{eloDelta} ELO
-          </span>
-          <p className="text-xs text-neutral-500">
-            Rating: <span className="text-neutral-300">{newElo}</span>
-          </p>
+            <div className="flex-1 text-center">
+              <p className="text-4xl font-extrabold tabular-nums text-white">
+                {scores[0]}
+              </p>
+              <p className="mt-1 text-[11px] font-medium uppercase tracking-widest text-neutral-500">
+                You
+              </p>
+            </div>
+            <div className="mx-4 h-10 w-px bg-game-border" />
+            <div className="flex-1 text-center">
+              <p className="text-4xl font-extrabold tabular-nums text-neutral-400">
+                {scores[1]}
+              </p>
+              <p className="mt-1 text-[11px] font-medium uppercase tracking-widest text-neutral-500">
+                Opponent
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 flex items-center justify-center gap-3">
+            <span className={`text-2xl font-bold tabular-nums ${eloColor}`}>
+              {eloSign}
+              {eloDelta}
+            </span>
+            <span className="text-sm text-neutral-500">
+              → {newElo} ELO
+            </span>
+          </div>
         </div>
 
-        <DialogFooter className="sm:justify-center">
+        <div className="flex gap-2 border-t border-game-border px-6 py-4">
+          <Button
+            onClick={() => {
+              reset();
+              router.push("/dashboard");
+            }}
+            variant="ghost"
+            className="flex-1 text-neutral-400 hover:text-neutral-200"
+          >
+            Dashboard
+          </Button>
           <Button
             onClick={reset}
-            variant="secondary"
-            className="w-full rounded-xl bg-game-border text-neutral-200 hover:bg-neutral-600"
+            className="flex-1 bg-lime-accent font-semibold text-black hover:bg-lime-accent/90"
           >
             Play Again
           </Button>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );

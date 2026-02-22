@@ -3,24 +3,78 @@ import { cors } from "hono/cors";
 import { eq, sql } from "drizzle-orm";
 import { createPgDb } from "./db/neon";
 import { pgSchema } from "./db/neon";
+import { createAuth } from "./lib/auth";
+import { authMiddleware } from "./middleware/auth";
 export { GameRoom } from "./game-room";
 export { MatchMaker } from "./matchmaker";
 
 const app = new Hono<{ Bindings: CloudflareBindings }>();
 
-app.use("*", cors());
+app.use(
+  "/api/auth/*",
+  cors({
+    origin: (origin) => origin ?? "*",
+    credentials: true,
+    allowHeaders: ["Content-Type", "Authorization"],
+    allowMethods: ["POST", "GET", "OPTIONS"],
+    maxAge: 600,
+  }),
+);
 
-app.get("/ws/matchmaking", (c) => {
-  const id = c.env.MATCHMAKER.idFromName("global");
-  const matchmaker = c.env.MATCHMAKER.get(id);
-  return matchmaker.fetch(c.req.raw);
+app.use(
+  "/api/*",
+  cors({
+    origin: (origin) => origin ?? "*",
+    credentials: true,
+  }),
+);
+
+app.on(["POST", "GET"], "/api/auth/*", (c) => {
+  const auth = createAuth(c.env);
+  return auth.handler(c.req.raw);
 });
 
-app.get("/ws/game/:roomId", (c) => {
+app.get("/api/me", authMiddleware, (c) => {
+  const user = c.get("user");
+  if (!user) return c.json({ error: "Unauthorized" }, 401);
+  return c.json(user);
+});
+
+app.get("/ws/matchmaking", async (c) => {
+  const auth = createAuth(c.env);
+  const session = await auth.api.getSession({
+    headers: c.req.raw.headers,
+  });
+  if (!session) return c.json({ error: "Unauthorized" }, 401);
+
+  const id = c.env.MATCHMAKER.idFromName("global");
+  const matchmaker = c.env.MATCHMAKER.get(id);
+
+  const url = new URL(c.req.url);
+  url.searchParams.set("userId", session.user.id);
+  url.searchParams.set("elo", String((session.user as any).elo ?? 1200));
+  url.searchParams.set("name", session.user.name ?? "");
+  const req = new Request(url.toString(), c.req.raw);
+  return matchmaker.fetch(req);
+});
+
+app.get("/ws/game/:roomId", async (c) => {
+  const auth = createAuth(c.env);
+  const session = await auth.api.getSession({
+    headers: c.req.raw.headers,
+  });
+  if (!session) return c.json({ error: "Unauthorized" }, 401);
+
   const roomId = c.req.param("roomId");
   const id = c.env.ROOM.idFromName(roomId);
   const room = c.env.ROOM.get(id);
-  return room.fetch(c.req.raw);
+
+  const url = new URL(c.req.url);
+  url.searchParams.set("userId", session.user.id);
+  url.searchParams.set("elo", String((session.user as any).elo ?? 1200));
+  url.searchParams.set("name", session.user.name ?? "");
+  const req = new Request(url.toString(), c.req.raw);
+  return room.fetch(req);
 });
 
 app.get("/api/health", (c) => {
@@ -38,7 +92,7 @@ app.get("/api/leaderboard", async (c) => {
   return c.json(result.results);
 });
 
-app.get("/api/user/:userId", async (c) => {
+app.get("/api/user/:userId", authMiddleware, async (c) => {
   const userId = c.req.param("userId");
   const user = await c.env.mathiks_db
     .prepare("SELECT id, name, elo, games_played FROM users WHERE id = ?")
@@ -48,7 +102,7 @@ app.get("/api/user/:userId", async (c) => {
   return c.json(user);
 });
 
-app.get("/api/user/:userId/matches", async (c) => {
+app.get("/api/user/:userId/matches", authMiddleware, async (c) => {
   const userId = c.req.param("userId");
   const limit = Number(c.req.query("limit") ?? 20);
   const result = await c.env.mathiks_db
@@ -71,7 +125,7 @@ export default {
     batch: MessageBatch<Record<string, any>>,
     env: CloudflareBindings,
   ) {
-    const pg = createPgDb(env.HYPERDRIVE);
+    const pg = createPgDb(env.DATABASE_URL);
 
     for (const msg of batch.messages) {
       const data = msg.body as Record<string, any>;
@@ -80,7 +134,6 @@ export default {
         const { player1, player2, seed, duration, timestamp } = data;
         const matchId = crypto.randomUUID();
 
-        // Neon (source of truth) — write via Hyperdrive
         await pg
           .update(pgSchema.users)
           .set({
@@ -110,36 +163,52 @@ export default {
           createdAt: new Date(timestamp),
         });
 
-        // D1 (edge read cache) — replicate the same writes
-        await env.mathiks_db.batch([
-          env.mathiks_db
-            .prepare(
-              `UPDATE users SET elo = elo + ?, games_played = games_played + 1 WHERE id = ?`,
-            )
-            .bind(player1.eloDelta, player1.userId),
-          env.mathiks_db
-            .prepare(
-              `UPDATE users SET elo = elo + ?, games_played = games_played + 1 WHERE id = ?`,
-            )
-            .bind(player2.eloDelta, player2.userId),
-          env.mathiks_db
-            .prepare(
-              `INSERT INTO matches (id, player1_id, player2_id, score1, score2, elo_delta1, elo_delta2, seed, duration, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            )
-            .bind(
-              matchId,
-              player1.userId,
-              player2.userId,
-              player1.score,
-              player2.score,
-              player1.eloDelta,
-              player2.eloDelta,
-              seed,
-              duration,
-              timestamp,
-            ),
-        ]);
+        try {
+          const now = Date.now();
+          await env.mathiks_db.batch([
+            env.mathiks_db
+              .prepare(
+                `INSERT OR IGNORE INTO users (id, name, email, elo, games_played, created_at)
+                 VALUES (?, '', ?, ?, 0, ?)`,
+              )
+              .bind(player1.userId, player1.userId, player1.elo, now),
+            env.mathiks_db
+              .prepare(
+                `INSERT OR IGNORE INTO users (id, name, email, elo, games_played, created_at)
+                 VALUES (?, '', ?, ?, 0, ?)`,
+              )
+              .bind(player2.userId, player2.userId, player2.elo, now),
+            env.mathiks_db
+              .prepare(
+                `UPDATE users SET elo = elo + ?, games_played = games_played + 1 WHERE id = ?`,
+              )
+              .bind(player1.eloDelta, player1.userId),
+            env.mathiks_db
+              .prepare(
+                `UPDATE users SET elo = elo + ?, games_played = games_played + 1 WHERE id = ?`,
+              )
+              .bind(player2.eloDelta, player2.userId),
+            env.mathiks_db
+              .prepare(
+                `INSERT INTO matches (id, player1_id, player2_id, score1, score2, elo_delta1, elo_delta2, seed, duration, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              )
+              .bind(
+                matchId,
+                player1.userId,
+                player2.userId,
+                player1.score,
+                player2.score,
+                player1.eloDelta,
+                player2.eloDelta,
+                seed,
+                duration,
+                timestamp,
+              ),
+          ]);
+        } catch (e) {
+          console.error("D1 write failed (Postgres is source of truth):", e);
+        }
       }
 
       msg.ack();

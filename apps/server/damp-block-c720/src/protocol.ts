@@ -4,7 +4,7 @@ export { encode, decode };
 
 export async function encryptQuestion(question: {
   expression: string;
-  answer: number;
+  digits: number;
 }): Promise<{ encrypted: Uint8Array; key: Uint8Array }> {
   const key = crypto.getRandomValues(new Uint8Array(16));
 

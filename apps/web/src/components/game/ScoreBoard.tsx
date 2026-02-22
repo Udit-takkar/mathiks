@@ -26,7 +26,7 @@ function PlayerCard({ name, elo, side, ringColor, isYou }: PlayerCardProps) {
       className={`flex items-center gap-2 ${isRight ? "flex-row-reverse" : ""}`}
     >
       <Avatar className={`h-10 w-10 ${ringColor}`}>
-        <AvatarFallback className="bg-violet-600 text-sm font-bold text-white">
+        <AvatarFallback className="bg-lime-accent text-sm font-bold text-black">
           {name[0]?.toUpperCase()}
         </AvatarFallback>
       </Avatar>
@@ -40,21 +40,26 @@ function PlayerCard({ name, elo, side, ringColor, isYou }: PlayerCardProps) {
   );
 }
 
-export function ScoreBoard() {
-  const { scores, opponent } = useGameStore();
+interface ScoreBoardProps {
+  userName: string;
+  userElo: number;
+}
+
+export function ScoreBoard({ userName, userElo }: ScoreBoardProps) {
+  const { scores, opponent, latency } = useGameStore();
 
   return (
     <div className="flex flex-col items-center gap-2 pt-8">
       <div className="flex items-center gap-16">
         <PlayerCard
-          name="You"
-          elo={1200}
+          name={userName}
+          elo={userElo}
           side="left"
-          ringColor="ring-2 ring-violet-500"
+          ringColor="ring-2 ring-lime-accent"
           isYou
         />
         <PlayerCard
-          name={opponent?.userId ?? "Opponent"}
+          name={opponent?.name || "Opponent"}
           elo={opponent?.elo ?? 1200}
           side="right"
           ringColor="ring-2 ring-red-400/60"
@@ -76,6 +81,12 @@ export function ScoreBoard() {
           {scores[1]}
         </Badge>
       </div>
+
+      {latency !== null && (
+        <p className="text-[11px] tabular-nums text-neutral-600">
+          {latency}ms
+        </p>
+      )}
     </div>
   );
 }

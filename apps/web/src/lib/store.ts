@@ -6,12 +6,13 @@ export type GameResult = "win" | "lose" | "draw";
 
 interface Question {
   expression: string;
-  answer: number;
+  digits: number;
 }
 
 interface Opponent {
   userId: string;
   elo: number;
+  name: string;
 }
 
 interface GameState {
@@ -26,6 +27,9 @@ interface GameState {
   result: GameResult | null;
   eloDelta: number;
   newElo: number;
+
+  latency: number | null;
+  wrongAnswer: boolean;
 
   serverStartsAt: number;
   duration: number;
@@ -49,6 +53,8 @@ interface GameState {
 
   endGame: (result: GameResult, eloDelta: number, newElo: number, scores: [number, number]) => void;
 
+  setLatency: (latency: number) => void;
+  setWrongAnswer: (wrong: boolean) => void;
   addPingSample: (serverTime: number) => void;
 
   setRoomId: (roomId: string) => void;
@@ -64,6 +70,8 @@ const initialState = {
   nextEncrypted: null,
   scores: [0, 0] as [number, number],
   opponent: null,
+  latency: null,
+  wrongAnswer: false,
   result: null,
   eloDelta: 0,
   newElo: 0,
@@ -103,6 +111,9 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   endGame: (result, eloDelta, newElo, scores) =>
     set({ phase: "ended", result, eloDelta, newElo, scores }),
+
+  setLatency: (latency) => set({ latency }),
+  setWrongAnswer: (wrongAnswer) => set({ wrongAnswer }),
 
   addPingSample: (serverTime) => {
     const now = Date.now();

@@ -44,3 +44,10 @@ queue = "mathiks-jobs"
 [[hyperdrive]]
 binding = "HYPERDRIVE"
 id = "432028a0868947689575f188be8f59cf"
+
+[vars]
+DATABASE_URL = ""
+BETTER_AUTH_URL = ""
+FRONTEND_URL = ""
+GOOGLE_CLIENT_ID = ""
+GOOGLE_CLIENT_SECRET = ""

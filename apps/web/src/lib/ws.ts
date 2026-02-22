@@ -5,11 +5,11 @@ type MessageHandler = (msg: ServerMessage) => void;
 export type ServerMessage =
   | {
       t: "game_start";
-      q: { expression: string; answer: number };
+      q: { expression: string; digits: number };
       nextEnc: Uint8Array;
       startsAt: number;
       duration: number;
-      opp: { userId: string; elo: number } | null;
+      opp: { userId: string; elo: number; name: string } | null;
     }
   | {
       t: "result";
@@ -32,7 +32,7 @@ export type ServerMessage =
   | {
       t: "matched";
       roomId: string;
-      opponent: { userId: string; elo: number };
+      opponent: { userId: string; elo: number; name: string };
     }
   | { t: "left_queue" }
   | { t: "error"; msg: string };
@@ -103,10 +103,12 @@ export class GameSocket {
     };
   }
 
-  send(msg: ClientMessage) {
+  send(msg: ClientMessage): boolean {
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(encode(msg));
+      return true;
     }
+    return false;
   }
 
   close() {
