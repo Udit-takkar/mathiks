@@ -5,6 +5,7 @@ import { createPgDb } from "./db/neon";
 import { pgSchema } from "./db/neon";
 import { createAuth } from "./lib/auth";
 import { authMiddleware } from "./middleware/auth";
+import { getShardName } from "./shard-config";
 export { GameRoom } from "./game-room";
 export { MatchMaker } from "./matchmaker";
 
@@ -47,13 +48,21 @@ app.get("/ws/matchmaking", async (c) => {
   });
   if (!session) return c.json({ error: "Unauthorized" }, 401);
 
-  const id = c.env.MATCHMAKER.idFromName("global");
+  const user = await c.env.mathiks_db
+    .prepare("SELECT elo FROM users WHERE id = ?")
+    .bind(session.user.id)
+    .first<{ elo: number }>();
+
+  const elo = user?.elo ?? 1200;
+  const shardName = getShardName(elo, session.user.id);
+  const id = c.env.MATCHMAKER.idFromName(shardName);
   const matchmaker = c.env.MATCHMAKER.get(id);
 
   const url = new URL(c.req.url);
   url.searchParams.set("userId", session.user.id);
-  url.searchParams.set("elo", String((session.user as any).elo ?? 1200));
+  url.searchParams.set("elo", String(elo));
   url.searchParams.set("name", session.user.name ?? "");
+  url.searchParams.set("shardName", shardName);
   const req = new Request(url.toString(), c.req.raw);
   return matchmaker.fetch(req);
 });
@@ -65,13 +74,18 @@ app.get("/ws/game/:roomId", async (c) => {
   });
   if (!session) return c.json({ error: "Unauthorized" }, 401);
 
+  const user = await c.env.mathiks_db
+    .prepare("SELECT elo FROM users WHERE id = ?")
+    .bind(session.user.id)
+    .first<{ elo: number }>();
+
   const roomId = c.req.param("roomId");
   const id = c.env.ROOM.idFromName(roomId);
   const room = c.env.ROOM.get(id);
 
   const url = new URL(c.req.url);
   url.searchParams.set("userId", session.user.id);
-  url.searchParams.set("elo", String((session.user as any).elo ?? 1200));
+  url.searchParams.set("elo", String(user?.elo ?? 1200));
   url.searchParams.set("name", session.user.name ?? "");
   const req = new Request(url.toString(), c.req.raw);
   return room.fetch(req);
