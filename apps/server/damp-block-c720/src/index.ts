@@ -7,7 +7,7 @@ import { createAuth } from "./lib/auth";
 import { authMiddleware } from "./middleware/auth";
 import { getShardName } from "./shard-config";
 export { GameRoom } from "./game-room";
-export { MatchMaker } from "./matchmaker";
+export { MatchMaker } from "./matchmaker/index";
 
 const app = new Hono<{ Bindings: CloudflareBindings }>();
 
