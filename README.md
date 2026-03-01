@@ -4,14 +4,14 @@ Real-time 1v1 competitive math game. Players are matched by ELO rating, solve ar
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Frontend | Next.js 16, React 19, Zustand, Tailwind CSS, shadcn/ui |
-| Backend | Cloudflare Workers (Hono), Durable Objects, Queues |
+| Layer    | Technology                                                     |
+| -------- | -------------------------------------------------------------- |
+| Frontend | Next.js 16, React 19, Zustand, Tailwind CSS, shadcn/ui         |
+| Backend  | Cloudflare Workers (Hono), Durable Objects, Queues             |
 | Database | Neon PostgreSQL (source of truth) + Cloudflare D1 (edge cache) |
-| Auth | Better Auth (email/password + Google OAuth) |
-| Protocol | msgpack binary over WebSocket, AES-GCM question encryption |
-| Monorepo | pnpm workspaces + Turborepo |
+| Auth     | Better Auth (email/password + Google OAuth)                    |
+| Protocol | msgpack binary over WebSocket, AES-GCM question encryption     |
+| Monorepo | pnpm workspaces + Turborepo                                    |
 
 ## Architecture
 
@@ -165,22 +165,22 @@ All messages are msgpack-encoded binary.
 
 **Matchmaking (`/ws/matchmaking`)**
 
-| Direction | Type | Payload |
-|-----------|------|---------|
-| Client → | `join_queue` | — |
-| Client → | `leave_queue` | — |
-| ← Server | `queued` | `position` |
-| ← Server | `matched` | `roomId`, `opponent: { userId, elo, name }` |
+| Direction | Type          | Payload                                     |
+| --------- | ------------- | ------------------------------------------- |
+| Client →  | `join_queue`  | —                                           |
+| Client →  | `leave_queue` | —                                           |
+| ← Server  | `queued`      | `position`                                  |
+| ← Server  | `matched`     | `roomId`, `opponent: { userId, elo, name }` |
 
 **Game Room (`/ws/game/:roomId`)**
 
-| Direction | Type | Payload |
-|-----------|------|---------|
-| Client → | `answer` | `a: number` |
-| ← Server | `game_start` | `q` (clear), `nextEnc` (encrypted), `startsAt`, `duration`, `opp` |
-| ← Server | `result` | `ok`, `key` (AES), `nextEnc`, `scores` |
-| ← Server | `opp_answered` | `scores` |
-| ← Server | `game_end` | `result`, `eloDelta`, `newElo`, `scores` |
+| Direction | Type           | Payload                                                           |
+| --------- | -------------- | ----------------------------------------------------------------- |
+| Client →  | `answer`       | `a: number`                                                       |
+| ← Server  | `game_start`   | `q` (clear), `nextEnc` (encrypted), `startsAt`, `duration`, `opp` |
+| ← Server  | `result`       | `ok`, `key` (AES), `nextEnc`, `scores`                            |
+| ← Server  | `opp_answered` | `scores`                                                          |
+| ← Server  | `game_end`     | `result`, `eloDelta`, `newElo`, `scores`                          |
 
 ## ELO System
 
@@ -249,15 +249,25 @@ pnpm dev
 
 ### Scripts
 
-| Script | Location | Description |
-|--------|----------|-------------|
-| `pnpm dev` | root | Start all apps via Turbo |
-| `pnpm dev` | `apps/web` | Next.js dev server |
-| `pnpm dev` | `apps/server/...` | Wrangler dev server |
-| `pnpm deploy` | `apps/server/...` | Deploy to Cloudflare |
-| `pnpm db:generate` | `apps/server/...` | Generate D1 migrations |
-| `pnpm db:migrate:local` | `apps/server/...` | Apply D1 migrations locally |
+| Script                   | Location          | Description                       |
+| ------------------------ | ----------------- | --------------------------------- |
+| `pnpm dev`               | root              | Start all apps via Turbo          |
+| `pnpm dev`               | `apps/web`        | Next.js dev server                |
+| `pnpm dev`               | `apps/server/...` | Wrangler dev server               |
+| `pnpm deploy`            | `apps/server/...` | Deploy to Cloudflare              |
+| `pnpm db:generate`       | `apps/server/...` | Generate D1 migrations            |
+| `pnpm db:migrate:local`  | `apps/server/...` | Apply D1 migrations locally       |
 | `pnpm db:migrate:remote` | `apps/server/...` | Apply D1 migrations to production |
-| `pnpm db:pg:generate` | `apps/server/...` | Generate PostgreSQL migrations |
-| `pnpm db:pg:migrate` | `apps/server/...` | Apply PostgreSQL migrations |
-| `pnpm cf-typegen` | `apps/server/...` | Generate Cloudflare binding types |
+| `pnpm db:pg:generate`    | `apps/server/...` | Generate PostgreSQL migrations    |
+| `pnpm db:pg:migrate`     | `apps/server/...` | Apply PostgreSQL migrations       |
+| `pnpm cf-typegen`        | `apps/server/...` | Generate Cloudflare binding types |
+
+For building next js container
+
+docker build \
+ --build-arg NEXT_PUBLIC_API_URL=http://host.docker.internal:8787 \
+ --build-arg NEXT_PUBLIC_WS_URL=ws://host.docker.internal:8787 \
+ --build-arg NEXT_PUBLIC_APP_URL=http://localhost:3000 \
+ -t mathiks-web .
+
+docker run -p 3000:3000 mathiks-web
